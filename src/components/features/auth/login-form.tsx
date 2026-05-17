@@ -6,6 +6,7 @@ import { signIn } from "next-auth/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LogIn, ShieldCheck } from "lucide-react";
 import { useForm } from "react-hook-form";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,19 +30,24 @@ export function LoginForm() {
   async function onSubmit(values: LoginInput) {
     setError(null);
     setLoadingProvider("credentials");
+    const loadingToast = toast.loading("Signing you in...");
     const response = await signIn("credentials", {
       email: values.email,
       password: values.password,
       redirect: false,
     });
     setLoadingProvider(null);
+    toast.dismiss(loadingToast);
 
     if (response?.error) {
-      setError("Those credentials did not match a demo user.");
+      const message = "Those credentials did not match a demo user.";
+      setError(message);
+      toast.error(message);
       return;
     }
 
     const role = inferRole(values.email);
+    toast.success(`Welcome back! Redirecting to your ${role.toLowerCase()} dashboard.`);
     router.push(ROLE_HOME[role]);
     router.refresh();
   }

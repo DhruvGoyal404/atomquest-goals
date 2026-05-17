@@ -19,6 +19,7 @@ export type User = {
   email: string;
   name: string;
   role: Role;
+  image?: string | null;
   managerId?: string | null;
   department?: string | null;
   designation?: string | null;

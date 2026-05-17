@@ -19,6 +19,8 @@ export function useRealtime() {
           case "GOAL_REJECTED":
           case "GOAL_DECIDED":
           case "GOAL_SHARED":
+          case "GOAL_UNLOCKED":
+          case "GOAL_EDITED_BY_MANAGER":
             void utils.goals.mine.invalidate();
             void utils.goals.list.invalidate();
             void utils.analytics.summary.invalidate();

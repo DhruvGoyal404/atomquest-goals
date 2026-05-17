@@ -2,7 +2,6 @@
 
 # dependencies
 .claude/
-.env.*
 .env.local
 *.md
 !LICENSE

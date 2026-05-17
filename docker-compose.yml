@@ -4,7 +4,8 @@ services:
     container_name: atomquest-mongo
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      # Host 27018 → container 27017 (local MongoDB already uses 27017)
+      - "27018:27017"
     volumes:
       - mongo-data:/data/db
     command: ["--replSet", "rs0", "--bind_ip_all"]

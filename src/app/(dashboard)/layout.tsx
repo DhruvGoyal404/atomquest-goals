@@ -11,9 +11,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/login");
   }
 
+  // DB is the source of truth (profile updates write here). Fall back to demo-store
+  // only when MongoDB is unreachable so the demo experience still works offline.
   const user =
-    getDemoUserById(session.user.id) ??
-    (await getUserById(session.user.id).catch(() => null));
+    (await getUserById(session.user.id).catch(() => null)) ??
+    getDemoUserById(session.user.id);
 
   if (!user) {
     redirect("/login");

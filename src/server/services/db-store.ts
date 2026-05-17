@@ -40,6 +40,7 @@ function toUser(u: NonNullable<PrismaUser>): User {
     email: u.email,
     name: u.name,
     role: u.role,
+    image: u.image ?? null,
     managerId: u.managerId ?? null,
     department: u.department ?? null,
     designation: u.designation ?? null,
@@ -50,6 +51,19 @@ function toUser(u: NonNullable<PrismaUser>): User {
     createdAt: u.createdAt.toISOString(),
     updatedAt: u.updatedAt.toISOString(),
   };
+}
+
+export async function updateUserProfile(
+  userId: string,
+  input: { name?: string; designation?: string | null; image?: string | null },
+): Promise<User> {
+  const data: { name?: string; designation?: string | null; image?: string | null } = {};
+  if (input.name !== undefined) data.name = sanitize(input.name);
+  if (input.designation !== undefined) data.designation = input.designation ? sanitize(input.designation) : null;
+  if (input.image !== undefined) data.image = input.image;
+  const updated = await prisma.user.update({ where: { id: userId }, data });
+  await invalidateUserCaches(userId);
+  return toUser(updated);
 }
 
 function toGoal(g: NonNullable<PrismaGoal>): Goal {
@@ -243,6 +257,15 @@ export async function createCycle(input: { name: string; startDate: Date; endDat
   return toCycle(cycle);
 }
 
+export async function listLockedGoals(): Promise<GoalWithOwner[]> {
+  const goals = await prisma.goal.findMany({
+    where: { isLocked: true, status: "APPROVED" },
+    include: { employee: { select: employeeSelect } },
+    orderBy: { lockedAt: "desc" },
+  });
+  return goals.map((g) => toGoalWithOwner(g as PrismaGoalWithEmployee));
+}
+
 // ---------------------------------------------------------------------------
 // Goals — Queries
 // ---------------------------------------------------------------------------
@@ -343,10 +366,27 @@ export async function createGoal(employeeId: string, input: GoalFormInput): Prom
 export async function updateGoal(employeeId: string, input: GoalFormInput & { id: string }): Promise<GoalWithOwner> {
   const existing = await prisma.goal.findUnique({ where: { id: input.id } });
   if (!existing) throw new Error("Goal not found.");
-  if (existing.employeeId !== employeeId) throw new Error("You can only edit your own goals.");
   if (existing.isLocked || existing.status === "APPROVED" || existing.status === "LOCKED") {
     throw new Error("Approved or locked goals cannot be edited.");
   }
+
+  // GAP 2 FIX: Shared goal recipients can only change weightage
+  const isSharedRecipient = existing.isShared && existing.sharedWith.includes(employeeId) && existing.primaryOwnerId !== employeeId;
+  if (isSharedRecipient) {
+    // Recipients may only adjust weightage; title, target, uomType are read-only
+    const before = JSON.stringify(existing);
+    const goal = await prisma.goal.update({
+      where: { id: input.id },
+      data: { weightage: Number(input.weightage) },
+      include: { employee: { select: employeeSelect } },
+    });
+    await prisma.auditLog.create({ data: { goalId: goal.id, userId: employeeId, action: "UPDATED", field: "weightage", oldValue: String(existing.weightage), newValue: String(input.weightage) } });
+    await invalidateUserCaches(employeeId);
+    return toGoalWithOwner(goal as PrismaGoalWithEmployee);
+  }
+
+  // Owner or self-owned goal: full edit
+  if (existing.employeeId !== employeeId) throw new Error("You can only edit your own goals.");
 
   const before = JSON.stringify(existing);
   const goal = await prisma.goal.update({
@@ -368,6 +408,79 @@ export async function updateGoal(employeeId: string, input: GoalFormInput & { id
 
   await prisma.auditLog.create({ data: { goalId: goal.id, userId: employeeId, action: "UPDATED", field: "goal", oldValue: before, newValue: JSON.stringify(goal) } });
   await invalidateUserCaches(employeeId);
+
+  return toGoalWithOwner(goal as PrismaGoalWithEmployee);
+}
+
+// GAP 1 FIX: Manager can inline-edit target/weightage on submitted goals before approving
+export async function managerEditGoal(managerId: string, goalId: string, edits: { target?: number; weightage?: number; comment?: string }): Promise<GoalWithOwner> {
+  const existing = await prisma.goal.findUnique({ where: { id: goalId } });
+  if (!existing) throw new Error("Goal not found.");
+  if (existing.status !== "SUBMITTED") throw new Error("Only submitted goals can be edited by the manager.");
+  const employee = await prisma.user.findUnique({ where: { id: existing.employeeId } });
+  if (!employee || employee.managerId !== managerId) throw new Error("This employee is not in your team.");
+
+  const data: Record<string, unknown> = {};
+  const changes: string[] = [];
+  if (edits.target !== undefined && edits.target !== existing.target) {
+    data.target = edits.target;
+    changes.push(`target: ${existing.target} → ${edits.target}`);
+  }
+  if (edits.weightage !== undefined && edits.weightage !== existing.weightage) {
+    data.weightage = edits.weightage;
+    changes.push(`weightage: ${existing.weightage} → ${edits.weightage}`);
+  }
+  if (Object.keys(data).length === 0) throw new Error("No changes provided.");
+
+  const goal = await prisma.goal.update({ where: { id: goalId }, data, include: { employee: { select: employeeSelect } } });
+  const manager = await prisma.user.findUnique({ where: { id: managerId }, select: { name: true } });
+
+  await prisma.auditLog.create({ data: { goalId, userId: managerId, action: "MANAGER_EDITED", field: "target/weightage", oldValue: `target:${existing.target},weightage:${existing.weightage}`, newValue: changes.join("; ") } });
+  await prisma.notification.create({
+    data: {
+      userId: employee.id,
+      type: "GOAL_EDITED_BY_MANAGER",
+      title: "Manager edited your goal",
+      message: `${manager?.name ?? "Manager"} adjusted "${goal.title}": ${changes.join(", ")}.${edits.comment ? " Comment: " + edits.comment : ""}`,
+      link: "/employee/goals",
+    },
+  });
+
+  await invalidateUserCaches(employee.id);
+  await invalidateUserCaches(managerId);
+  await publish(`events:${employee.id}`, { type: "GOAL_EDITED_BY_MANAGER", goalId });
+
+  return toGoalWithOwner(goal as PrismaGoalWithEmployee);
+}
+
+// GAP 5 FIX: Admin can unlock a locked/approved goal for re-editing
+export async function adminUnlockGoal(adminId: string, goalId: string): Promise<GoalWithOwner> {
+  const admin = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true, name: true } });
+  if (!admin || admin.role !== "ADMIN") throw new Error("Admin access required.");
+
+  const existing = await prisma.goal.findUnique({ where: { id: goalId } });
+  if (!existing) throw new Error("Goal not found.");
+  if (!existing.isLocked && existing.status !== "APPROVED") throw new Error("Goal is not locked.");
+
+  const goal = await prisma.goal.update({
+    where: { id: goalId },
+    data: { isLocked: false, lockedAt: null, lockedBy: null, status: "DRAFT" },
+    include: { employee: { select: employeeSelect } },
+  });
+
+  await prisma.auditLog.create({ data: { goalId, userId: adminId, action: "UNLOCKED", field: "status", oldValue: existing.status, newValue: "DRAFT" } });
+  await prisma.notification.create({
+    data: {
+      userId: existing.employeeId,
+      type: "GOAL_UNLOCKED",
+      title: "Goal unlocked",
+      message: `${admin.name} unlocked "${goal.title}" for re-editing.`,
+      link: "/employee/goals",
+    },
+  });
+
+  await invalidateUserCaches(existing.employeeId);
+  await publish(`events:${existing.employeeId}`, { type: "GOAL_UNLOCKED", goalId });
 
   return toGoalWithOwner(goal as PrismaGoalWithEmployee);
 }
@@ -450,6 +563,23 @@ export async function addCheckIn(actorId: string, input: CheckInInput): Promise<
   const actor = await prisma.user.findUnique({ where: { id: actorId } });
   if (!employee || !actor) throw new Error("User not found.");
 
+  // GAP 4 FIX: Enforce check-in window — only allow if current date is within the quarter window
+  if (actor.role !== "ADMIN") {
+    const cycle = await prisma.goalCycle.findUnique({ where: { id: goal.cycleId } });
+    if (cycle) {
+      const windowKey = `${input.quarter.toLowerCase()}Window` as "q1Window" | "q2Window" | "q3Window" | "q4Window";
+      const window = cycle[windowKey] as { start: string; end: string } | null;
+      if (window) {
+        const now = new Date();
+        const windowStart = new Date(window.start);
+        const windowEnd = new Date(window.end);
+        if (now < windowStart || now > windowEnd) {
+          throw new Error(`${input.quarter} check-in window is not open. It runs from ${windowStart.toLocaleDateString()} to ${windowEnd.toLocaleDateString()}.`);
+        }
+      }
+    }
+  }
+
   const managerId = actor.role === "MANAGER" ? actor.id : employee.managerId;
   if (!managerId) throw new Error("A manager is required for check-ins.");
   if (actor.role === "EMPLOYEE" && actor.id !== employee.id) throw new Error("Employees can only update their own check-ins.");
@@ -471,12 +601,26 @@ export async function addCheckIn(actorId: string, input: CheckInInput): Promise<
   });
 
   // Update goal progress + quarterly achievement
+  const achievementUpdate = { planned: input.plannedValue, actual: input.actualValue, status: deriveAchievementStatus(progressScore), updatedAt: new Date().toISOString() };
   const achievements = (goal.achievements as Goal["achievements"]).map((a) =>
-    a.quarter === input.quarter
-      ? { ...a, planned: input.plannedValue, actual: input.actualValue, status: deriveAchievementStatus(progressScore), updatedAt: new Date().toISOString() }
-      : a,
+    a.quarter === input.quarter ? { ...a, ...achievementUpdate } : a,
   );
   await prisma.goal.update({ where: { id: goal.id }, data: { currentProgress: progressScore, lastUpdatedAt: new Date(), achievements: achievements as unknown as Prisma.InputJsonValue[] } });
+
+  // GAP 3 FIX: If this is a shared goal with a primary owner, sync achievements to all linked copies
+  if (goal.isShared && goal.primaryOwnerId === goal.employeeId && goal.sharedWith.length > 0) {
+    const linkedGoals = await prisma.goal.findMany({
+      where: { title: goal.title, employeeId: { in: goal.sharedWith }, cycleId: goal.cycleId },
+      select: { id: true, achievements: true },
+    });
+    for (const linked of linkedGoals) {
+      const linkedAchievements = (linked.achievements as Goal["achievements"]).map((a) =>
+        a.quarter === input.quarter ? { ...a, ...achievementUpdate } : a,
+      );
+      await prisma.goal.update({ where: { id: linked.id }, data: { currentProgress: progressScore, lastUpdatedAt: new Date(), achievements: linkedAchievements as unknown as Prisma.InputJsonValue[] } });
+    }
+  }
+
   await prisma.auditLog.create({ data: { goalId: goal.id, userId: actorId, action: "CHECKED_IN", field: "currentProgress", newValue: String(progressScore) } });
   await prisma.notification.create({
     data: {

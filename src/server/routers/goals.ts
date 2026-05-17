@@ -19,6 +19,7 @@ import {
   listGoalsForUser,
   listPeers,
   listTeamGoals,
+  managerEditGoal,
   shareGoal,
   submitGoals,
   updateGoal,
@@ -64,6 +65,14 @@ export const goalsRouter = createTRPCRouter({
 
     return goal;
   }),
+  managerEdit: managerProcedure
+    .input(z.object({
+      goalId: z.string().min(1),
+      target: z.number().positive().optional(),
+      weightage: z.number().int().min(10).max(100).optional(),
+      comment: z.string().max(700).optional(),
+    }))
+    .mutation(({ ctx, input }) => managerEditGoal(ctx.user.id, input.goalId, input)),
   suggest: protectedProcedure.input(aiSuggestionInputSchema).query(({ input }) => suggestGoals(input.department, input.designation)),
   peers: protectedProcedure.query(({ ctx }) => listPeers(ctx.user.id)),
   share: protectedProcedure
