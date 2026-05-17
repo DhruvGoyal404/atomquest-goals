@@ -334,7 +334,7 @@ export default async function HomePage() {
           <div className="flex gap-6">
             <Link href={ctaHref} className="hover:text-foreground transition-colors">{ctaLabel}</Link>
             <a
-              href="https://github.com/dhruv-goyal/atomquest-portal"
+              href="https://github.com/DhruvGoyal404/atomquest-goals"
               className="hover:text-foreground transition-colors"
               target="_blank"
               rel="noopener noreferrer"

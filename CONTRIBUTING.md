@@ -14,7 +14,7 @@ Thank you for your interest in contributing! This guide covers everything you ne
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/dhruv-goyal/atomquest-portal.git
+git clone https://github.com/DhruvGoyal404/atomquest-goals
 cd atomquest-portal
 
 # 2. Install dependencies
