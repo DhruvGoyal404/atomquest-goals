@@ -1,42 +1,31 @@
 import { NextResponse } from "next/server";
-import NextAuth from "next-auth";
-import { authConfig } from "@/lib/auth/auth.config";
+import { auth } from "@/lib/auth";
 import { ROLE_HOME } from "@/lib/constants/app";
 
 const protectedPrefixes = ["/employee", "/manager", "/admin"];
-const authPaths = ["/login", "/"];
-
-// ✅ Use Edge-safe authConfig (no Prisma/bcryptjs)
-const { auth } = NextAuth(authConfig);
 
 export default auth((request) => {
   const { nextUrl } = request;
   const session = request.auth;
   const pathname = nextUrl.pathname;
   const isProtected = protectedPrefixes.some((prefix) => pathname.startsWith(prefix));
-  const isAuthPath = authPaths.includes(pathname);
-  const hasRole = session?.user?.role as keyof typeof ROLE_HOME | undefined;
-
-  // Logged-in user hits /login or / → redirect to role-specific dashboard
-  if (isAuthPath && hasRole && ROLE_HOME[hasRole]) {
-    return NextResponse.redirect(new URL(ROLE_HOME[hasRole], nextUrl));
-  }
+  const userRole = session?.user?.role;
 
   // Unauthenticated user hits protected route → redirect to /login
-  if (isProtected && !session?.user) {
+  if (isProtected && !userRole) {
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
 
-  // Role-based access control for protected routes
-  if (hasRole) {
-    if (pathname.startsWith("/admin") && hasRole !== "ADMIN") {
-      return NextResponse.redirect(new URL(ROLE_HOME[hasRole], nextUrl));
+  // Role-based access control
+  if (userRole) {
+    if (pathname.startsWith("/admin") && userRole !== "ADMIN") {
+      return NextResponse.redirect(new URL(ROLE_HOME[userRole], nextUrl));
     }
     if (
       pathname.startsWith("/manager") &&
-      !["MANAGER", "ADMIN"].includes(hasRole)
+      !["MANAGER", "ADMIN"].includes(userRole)
     ) {
-      return NextResponse.redirect(new URL(ROLE_HOME[hasRole], nextUrl));
+      return NextResponse.redirect(new URL(ROLE_HOME[userRole], nextUrl));
     }
   }
 
