@@ -81,6 +81,7 @@ body {
 .glass-panel {
   border: 1px solid hsl(var(--border) / 0.78);
   background: hsl(var(--card) / 0.78);
+  -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
   box-shadow: 0 18px 50px hsl(222 47% 11% / 0.08);
 }

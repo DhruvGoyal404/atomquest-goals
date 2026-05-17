@@ -20,7 +20,18 @@ export async function downloadPdfFromElement(filename: string, element: HTMLElem
     import("html2canvas"),
     import("jspdf"),
   ]);
-  const canvas = await html2canvas(element, { scale: 2, backgroundColor: null });
+  
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    backgroundColor: "#ffffff",
+    allowTaint: true,
+    useCORS: true,
+    ignoreElements: (el: Element) => {
+      // Skip SVG elements that may contain unsupported color functions
+      return el.tagName === "svg" && el.querySelector("path") !== null;
+    },
+  });
+  
   const image = canvas.toDataURL("image/png");
   const pdf = new JsPDF("p", "mm", "a4");
   const width = pdf.internal.pageSize.getWidth();

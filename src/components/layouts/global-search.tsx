@@ -80,7 +80,7 @@ export function GlobalSearch({ items, className }: { items: SearchItem[]; classN
           ref={inputRef}
           type="text"
           role="combobox"
-          aria-expanded={open}
+          aria-expanded={open ? "true" : "false"}
           aria-controls="global-search-listbox"
           aria-autocomplete="list"
           placeholder="Search pages..."
@@ -91,7 +91,7 @@ export function GlobalSearch({ items, className }: { items: SearchItem[]; classN
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
-          className="h-10 w-full rounded-md border bg-background/80 pl-9 pr-9 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+          className="h-10 w-full rounded-lg border border-input bg-card/40 pl-9 pr-9 text-sm outline-none transition-all placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:bg-card"
         />
         {query && (
           <button
@@ -100,7 +100,7 @@ export function GlobalSearch({ items, className }: { items: SearchItem[]; classN
               setQuery("");
               inputRef.current?.focus();
             }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label="Clear search"
           >
             <X className="size-3.5" />
@@ -112,38 +112,40 @@ export function GlobalSearch({ items, className }: { items: SearchItem[]; classN
         <div
           id="global-search-listbox"
           role="listbox"
-          className="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-auto rounded-md border bg-popover p-1 shadow-lg"
+          className="absolute left-0 right-0 top-full z-50 mt-2 max-h-96 overflow-auto rounded-lg border border-border/50 bg-card/95 backdrop-blur-sm shadow-xl"
         >
           {filtered.length === 0 ? (
-            <p className="px-3 py-4 text-center text-sm text-muted-foreground">
+            <p className="px-4 py-6 text-center text-sm text-muted-foreground">
               No pages match &quot;{query}&quot;
             </p>
           ) : (
-            filtered.map((item, index) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  role="option"
-                  aria-selected={index === activeIndex}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onClick={() => {
-                    setQuery("");
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    "flex h-10 items-center gap-3 rounded-sm px-3 text-sm transition-colors",
-                    index === activeIndex
-                      ? "bg-primary/10 text-primary"
-                      : "text-foreground hover:bg-muted",
-                  )}
-                >
-                  <Icon className="size-4" />
-                  {item.label}
-                </Link>
-              );
-            })
+            <div className="p-1" role="group">
+              {filtered.map((item, index) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    role="option"
+                    aria-selected={index === activeIndex ? "true" : "false"}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => {
+                      setQuery("");
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      "flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-all",
+                      index === activeIndex
+                        ? "bg-primary/15 text-primary shadow-sm"
+                        : "text-foreground hover:bg-muted/60",
+                    )}
+                  >
+                    <Icon className="size-4 shrink-0 opacity-70" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
           )}
         </div>
       )}

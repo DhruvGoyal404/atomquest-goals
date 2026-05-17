@@ -374,7 +374,6 @@ export async function updateGoal(employeeId: string, input: GoalFormInput & { id
   const isSharedRecipient = existing.isShared && existing.sharedWith.includes(employeeId) && existing.primaryOwnerId !== employeeId;
   if (isSharedRecipient) {
     // Recipients may only adjust weightage; title, target, uomType are read-only
-    const before = JSON.stringify(existing);
     const goal = await prisma.goal.update({
       where: { id: input.id },
       data: { weightage: Number(input.weightage) },
