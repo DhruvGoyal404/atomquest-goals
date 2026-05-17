@@ -5,6 +5,7 @@ import { checkInsRouter } from "@/server/routers/check-ins";
 import { escalationsRouter } from "@/server/routers/escalations";
 import { goalsRouter } from "@/server/routers/goals";
 import { notificationsRouter } from "@/server/routers/notifications";
+import { searchRouter } from "@/server/routers/search";
 import { userRouter } from "@/server/routers/user";
 
 export const appRouter = createTRPCRouter({
@@ -14,6 +15,7 @@ export const appRouter = createTRPCRouter({
   escalations: escalationsRouter,
   goals: goalsRouter,
   notifications: notificationsRouter,
+  search: searchRouter,
   user: userRouter,
 });
 
