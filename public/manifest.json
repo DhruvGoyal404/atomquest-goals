@@ -1,0 +1,17 @@
+{
+  "name": "AtomQuest Goals",
+  "short_name": "AQ Goals",
+  "description": "Goal setting and tracking portal for AtomQuest Hackathon 2026",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

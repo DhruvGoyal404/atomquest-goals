@@ -1,0 +1,251 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  ADMIN
+}
+
+enum UoMType {
+  MIN_NUMERIC
+  MAX_NUMERIC
+  MIN_PERCENTAGE
+  MAX_PERCENTAGE
+  TIMELINE
+  ZERO
+}
+
+enum GoalStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  LOCKED
+}
+
+enum AchievementStatus {
+  NOT_STARTED
+  ON_TRACK
+  COMPLETED
+  AT_RISK
+}
+
+enum Quarter {
+  Q1
+  Q2
+  Q3
+  Q4
+}
+
+model User {
+  id               String         @id @default(auto()) @map("_id") @db.ObjectId
+  email            String         @unique
+  emailVerified    DateTime?
+  image            String?
+  name             String
+  role             Role           @default(EMPLOYEE)
+  managerId        String?        @db.ObjectId
+  manager          User?          @relation("ManagerEmployee", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees        User[]         @relation("ManagerEmployee")
+  department       String?
+  designation      String?
+  employeeCode     String?        @unique
+  azureAdId        String?        @unique
+  azureAdEmail     String?
+  passwordHash     String?
+  streakCount      Int            @default(0)
+  lastLoginAt      DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  goals            Goal[]
+  checkInsGiven    CheckIn[]      @relation("ManagerCheckIns")
+  checkInsReceived CheckIn[]      @relation("EmployeeCheckIns")
+  auditLogs        AuditLog[]
+  notifications    Notification[]
+  accounts         Account[]
+  sessions         Session[]
+
+  @@index([role])
+  @@index([managerId])
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique
+  userId       String   @db.ObjectId
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model GoalCycle {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  q1Window  Json
+  q2Window  Json
+  q3Window  Json
+  q4Window  Json
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  goals     Goal[]
+
+  @@index([isActive])
+  @@map("goal_cycles")
+}
+
+model Goal {
+  id              String     @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId      String     @db.ObjectId
+  employee        User       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  cycleId         String     @db.ObjectId
+  cycle           GoalCycle  @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  thrustArea      String
+  title           String
+  description     String?
+  uomType         UoMType
+  target          Float
+  targetDate      DateTime?
+  weightage       Int
+  status          GoalStatus @default(DRAFT)
+  isLocked        Boolean    @default(false)
+  lockedAt        DateTime?
+  lockedBy        String?    @db.ObjectId
+  isShared        Boolean    @default(false)
+  primaryOwnerId  String?    @db.ObjectId
+  sharedWith      String[]   @db.ObjectId
+  currentProgress Float      @default(0)
+  lastUpdatedAt   DateTime?
+  achievements    Json[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  checkIns        CheckIn[]
+  auditLogs       AuditLog[]
+
+  @@index([employeeId])
+  @@index([cycleId])
+  @@index([status])
+  @@index([isLocked])
+  @@index([isShared])
+  @@index([primaryOwnerId])
+  @@map("goals")
+}
+
+model CheckIn {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId    String   @db.ObjectId
+  employee      User     @relation("EmployeeCheckIns", fields: [employeeId], references: [id], onDelete: Cascade)
+  managerId     String   @db.ObjectId
+  manager       User     @relation("ManagerCheckIns", fields: [managerId], references: [id], onDelete: Cascade)
+  goalId        String   @db.ObjectId
+  goal          Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  quarter       Quarter
+  comments      String
+  plannedValue  Float
+  actualValue   Float
+  progressScore Float
+  checkInDate   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([managerId])
+  @@index([goalId])
+  @@index([quarter])
+  @@map("check_ins")
+}
+
+model AuditLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  goalId    String   @db.ObjectId
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  field     String?
+  oldValue  String?
+  newValue  String?
+  timestamp DateTime @default(now())
+
+  @@index([goalId])
+  @@index([userId])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model Escalation {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  type            String
+  employeeId      String    @db.ObjectId
+  managerId       String?   @db.ObjectId
+  escalationLevel Int       @default(1)
+  dueDate         DateTime
+  resolved        Boolean   @default(false)
+  resolvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([resolved])
+  @@index([dueDate])
+  @@map("escalations")
+}

@@ -1,0 +1,48 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: atomquest-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    healthcheck:
+      test: |
+        mongosh --quiet --eval "
+          try { rs.status().ok } catch (e) {
+            rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}).ok
+          }
+        "
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: atomquest-app
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: mongodb://mongo:27017/atomquest?replicaSet=rs0
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-in-production}
+      NEXTAUTH_SECRET: ${AUTH_SECRET:-change-me-in-production}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      NEXTAUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      AZURE_AD_CLIENT_ID: ${AZURE_AD_CLIENT_ID:-}
+      AZURE_AD_CLIENT_SECRET: ${AZURE_AD_CLIENT_SECRET:-}
+      AZURE_AD_TENANT_ID: ${AZURE_AD_TENANT_ID:-}
+      REDIS_URL: ${REDIS_URL:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+volumes:
+  mongo-data:
