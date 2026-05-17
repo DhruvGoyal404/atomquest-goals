@@ -12,8 +12,12 @@ export const metadata: Metadata = {
 
 export default async function LoginPage() {
   const session = await auth();
-  if (session?.user?.role && ROLE_HOME[session.user.role]) {
-    redirect(ROLE_HOME[session.user.role]);
+  // Redirect authenticated users immediately to their role-specific dashboard
+  if (session?.user?.role) {
+    const home = ROLE_HOME[session.user.role as keyof typeof ROLE_HOME];
+    if (home) {
+      redirect(home);
+    }
   }
 
   return (
