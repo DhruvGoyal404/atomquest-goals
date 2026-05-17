@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import NextAuth from "next-auth";
-import { authConfig } from "@/lib/auth/auth.config";
+import { auth } from "@/lib/auth";
 import { ROLE_HOME } from "@/lib/constants/app";
 
 const protectedPrefixes = ["/employee", "/manager", "/admin"];
 const authPaths = ["/login", "/"];
 
-const { auth } = NextAuth(authConfig);
-
-export default auth((request: NextRequest) => {
+export default auth((request) => {
   const { nextUrl } = request;
   const session = request.auth;
   const pathname = nextUrl.pathname;

@@ -3,6 +3,25 @@ import AzureADProvider from "next-auth/providers/azure-ad";
 import type { Role } from "@/types/domain";
 
 // ---------------------------------------------------------------------------
+// Type augmentation for NextAuth
+declare module "next-auth" {
+  interface JWT {
+    id?: string;
+    email?: string;
+    role?: Role;
+  }
+  interface Session {
+    user: {
+      id?: string;
+      email?: string;
+      role?: Role;
+      name?: string | null;
+      image?: string | null;
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Edge-safe auth config. This file is imported by middleware.ts which runs
 // on the Edge runtime. It MUST NOT import Prisma, bcryptjs, or any Node-only
 // module. The CredentialsProvider (which needs Prisma + bcrypt) is added in
