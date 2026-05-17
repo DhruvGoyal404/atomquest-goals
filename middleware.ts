@@ -3,13 +3,20 @@ import { auth } from "@/lib/auth";
 import { ROLE_HOME } from "@/lib/constants/app";
 
 const protectedPrefixes = ["/employee", "/manager", "/admin"];
+const publicOnlyPaths = ["/login", "/"];
 
 export default auth((request) => {
   const { nextUrl } = request;
   const session = request.auth;
   const pathname = nextUrl.pathname;
   const isProtected = protectedPrefixes.some((prefix) => pathname.startsWith(prefix));
+  const isPublicOnly = publicOnlyPaths.includes(pathname);
   const userRole = session?.user?.role;
+
+  // ✅ AUTHENTICATED user tries to access /login or / → redirect to dashboard
+  if (isPublicOnly && userRole && ROLE_HOME[userRole]) {
+    return NextResponse.redirect(new URL(ROLE_HOME[userRole], nextUrl));
+  }
 
   // Unauthenticated user hits protected route → redirect to /login
   if (isProtected && !userRole) {
