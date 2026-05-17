@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import NextAuth from "next-auth";
+import { authConfig } from "@/lib/auth/auth.config";
 import { ROLE_HOME } from "@/lib/constants/app";
 
 const protectedPrefixes = ["/employee", "/manager", "/admin"];
 const authPaths = ["/login", "/"];
+
+// ✅ Use Edge-safe authConfig (no Prisma/bcryptjs)
+const { auth } = NextAuth(authConfig);
 
 export default auth((request) => {
   const { nextUrl } = request;
