@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import toast from "react-hot-toast";
 import { Download, FileSpreadsheet, FileText, Scale, Share2, ShieldCheck, Target, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,12 +11,11 @@ import { GoalForm } from "@/components/features/goals/goal-form";
 import { ShareGoalDialog } from "@/components/features/goals/share-goal-dialog";
 import { MetricCard } from "@/components/features/analytics/metric-card";
 import { trpc } from "@/components/providers/trpc-provider";
-import { downloadCsv, downloadExcel, downloadPdfFromElement } from "@/lib/utils/exporters";
+import { downloadCsv, downloadExcel, downloadGoalsPdf, type GoalExportRow } from "@/lib/utils/exporters";
 import { formatPercent } from "@/lib/utils/format";
 import type { GoalWithOwner } from "@/types/domain";
 
 export function GoalsWorkspace() {
-  const reportRef = useRef<HTMLDivElement>(null);
   const [sharingGoal, setSharingGoal] = useState<GoalWithOwner | null>(null);
   const utils = trpc.useUtils();
   const goals = trpc.goals.mine.useQuery();
@@ -55,17 +54,17 @@ export function GoalsWorkspace() {
   }
 
   async function exportAsPdf() {
-    if (!reportRef.current) return;
     try {
-      await downloadPdfFromElement("atomquest-goals.pdf", reportRef.current);
+      const rows = ((await exportRows.refetch()).data ?? []) as GoalExportRow[];
+      await downloadGoalsPdf("atomquest-goals.pdf", rows, summary.data);
       toast.success("PDF downloaded");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "PDF export failed (oklab colors not supported — switch to light theme and retry)");
+      toast.error(e instanceof Error ? e.message : "PDF export failed");
     }
   }
 
   return (
-    <div className="space-y-6" ref={reportRef}>
+    <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-medium text-primary">Employee workspace</p>
