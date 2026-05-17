@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { auth } from "@/lib/auth/auth.edge";
 import { ROLE_HOME } from "@/lib/constants/app";
 
 const protectedPrefixes = ["/employee", "/manager", "/admin"];

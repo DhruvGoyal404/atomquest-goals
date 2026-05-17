@@ -21,15 +21,20 @@ export async function downloadPdfFromElement(filename: string, element: HTMLElem
     import("jspdf"),
   ]);
   
-  const canvas = await html2canvas(element, {
+  // Clone element to avoid modifying DOM
+  const clonedElement = element.cloneNode(true) as HTMLElement;
+  
+  // Remove SVG elements and chart components that may have unsupported color functions (oklab, etc)
+  clonedElement.querySelectorAll("svg, [role='img']").forEach((el) => {
+    el.remove();
+  });
+  
+  const canvas = await html2canvas(clonedElement, {
     scale: 2,
     backgroundColor: "#ffffff",
     allowTaint: true,
     useCORS: true,
-    ignoreElements: (el: Element) => {
-      // Skip SVG elements that may contain unsupported color functions
-      return el.tagName === "svg" && el.querySelector("path") !== null;
-    },
+    logging: false, // Suppress oklab warnings
   });
   
   const image = canvas.toDataURL("image/png");
