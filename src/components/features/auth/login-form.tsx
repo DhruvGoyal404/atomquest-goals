@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession, signIn } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LogIn, ShieldCheck } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -17,7 +17,6 @@ import type { Role } from "@/types/domain";
 
 export function LoginForm() {
   const router = useRouter();
-  const session = useSession();
   const [error, setError] = useState<string | null>(null);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const form = useForm<LoginInput>({
@@ -27,19 +26,6 @@ export function LoginForm() {
       password: "demo123",
     },
   });
-
-  // ✅ Client-side redirect if already authenticated
-  useEffect(() => {
-    // Guard: only redirect if session data is available
-    if (session?.data?.user?.role) {
-      const home = ROLE_HOME[session.data.user.role as Role];
-      if (home) {
-        toast.success(`Already signed in! Redirecting...`);
-        router.push(home);
-        router.refresh();
-      }
-    }
-  }, [session?.data?.user?.role, router]);
 
   async function onSubmit(values: LoginInput) {
     setError(null);
@@ -61,7 +47,7 @@ export function LoginForm() {
     }
 
     const role = inferRole(values.email);
-    toast.success(`Welcome back! Redirecting to your ${role.toLowerCase()} dashboard.`);
+    toast.success(`Welcome! Redirecting to your ${role.toLowerCase()} dashboard...`);
     router.push(ROLE_HOME[role]);
     router.refresh();
   }

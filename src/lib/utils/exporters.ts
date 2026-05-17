@@ -24,25 +24,41 @@ export async function downloadPdfFromElement(filename: string, element: HTMLElem
   // Clone element to avoid modifying DOM
   const clonedElement = element.cloneNode(true) as HTMLElement;
   
-  // Remove SVG elements and chart components that may have unsupported color functions (oklab, etc)
-  clonedElement.querySelectorAll("svg, [role='img']").forEach((el) => {
+  // Remove ALL chart/SVG/canvas elements that have oklab colors
+  clonedElement.querySelectorAll("svg, canvas, [role='img'], .recharts-wrapper").forEach((el) => {
     el.remove();
   });
   
-  const canvas = await html2canvas(clonedElement, {
-    scale: 2,
-    backgroundColor: "#ffffff",
-    allowTaint: true,
-    useCORS: true,
-    logging: false, // Suppress oklab warnings
+  // Remove all style attributes to prevent oklab in computed styles
+  clonedElement.querySelectorAll("*").forEach((el) => {
+    el.removeAttribute("style");
   });
   
-  const image = canvas.toDataURL("image/png");
-  const pdf = new JsPDF("p", "mm", "a4");
-  const width = pdf.internal.pageSize.getWidth();
-  const height = (canvas.height * width) / canvas.width;
-  pdf.addImage(image, "PNG", 0, 0, width, Math.min(height, pdf.internal.pageSize.getHeight()));
-  pdf.save(filename);
+  // Create a container with white background
+  const container = document.createElement("div");
+  container.style.backgroundColor = "#ffffff";
+  container.style.padding = "20px";
+  container.appendChild(clonedElement);
+  
+  try {
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      allowTaint: true,
+      useCORS: true,
+      logging: false, // Suppress console warnings
+    });
+    
+    const image = canvas.toDataURL("image/png");
+    const pdf = new JsPDF("p", "mm", "a4");
+    const width = pdf.internal.pageSize.getWidth();
+    const height = (canvas.height * width) / canvas.width;
+    pdf.addImage(image, "PNG", 0, 0, width, Math.min(height, pdf.internal.pageSize.getHeight()));
+    pdf.save(filename);
+  } catch (err) {
+    console.error("PDF export error:", err);
+    throw new Error("PDF export failed - please try again or use light theme");
+  }
 }
 
 function csvCell(value: string | number | undefined) {
