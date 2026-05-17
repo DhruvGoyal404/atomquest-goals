@@ -17,7 +17,7 @@ import type { Role } from "@/types/domain";
 
 export function LoginForm() {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const session = useSession();
   const [error, setError] = useState<string | null>(null);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const form = useForm<LoginInput>({
@@ -30,15 +30,16 @@ export function LoginForm() {
 
   // ✅ Client-side redirect if already authenticated
   useEffect(() => {
-    if (status === "authenticated" && session?.user?.role) {
-      const home = ROLE_HOME[session.user.role as Role];
+    // Guard: only redirect if session data is available
+    if (session?.data?.user?.role) {
+      const home = ROLE_HOME[session.data.user.role as Role];
       if (home) {
         toast.success(`Already signed in! Redirecting...`);
         router.push(home);
         router.refresh();
       }
     }
-  }, [status, session, router]);
+  }, [session?.data?.user?.role, router]);
 
   async function onSubmit(values: LoginInput) {
     setError(null);
