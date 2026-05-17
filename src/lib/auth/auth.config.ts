@@ -68,19 +68,24 @@ export const authConfig = {
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // On first login, set user data
       if (user?.id) {
         token.id = user.id;
         token.email = user.email;
+        token.role = user.role || "EMPLOYEE";
       }
-      if (user?.role) {
+      // ✅ PRESERVE role on token refresh (when user is undefined)
+      // This ensures role is always in the JWT even on subsequent requests
+      if (!token.role && user?.role) {
         token.role = user.role;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        if (token.id) session.user.id = String(token.id);
-        if (token.role) session.user.role = token.role as Role;
+        session.user.id = token.id as string;
+        session.user.email = token.email as string;
+        session.user.role = (token.role as Role) || "EMPLOYEE";
       }
       return session;
     },
